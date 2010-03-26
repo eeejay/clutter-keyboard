@@ -4,6 +4,7 @@ import cluttergtk   # must be the first to be imported
 import clutter
 import gtk
 import qwerty
+import glib
 
 SCALE = 1.0
 
@@ -66,52 +67,63 @@ def main ():
     # Show the stage
     stage.show()
 
-    offsetx, offsety = 0, 0
-
     maxw, maxh = 0, 0
 
     grid = []
 
     for row in qwerty.lowercase:
+        trow = []
         for k in row:
             if isinstance(k, tuple):
                 k = k[0]
 
-            g = clutter.Group()
-
             text = clutter.Text(
                 "Sans 10", k, clutter.Color(0xff, 0, 0, 0xff))
-            text.set_position(offsetx + 15, offsety + 10)
 
             if text.get_width() > maxw:
                 maxw = text.get_width()
 
             if text.get_height() > maxh:
-                maxw = text.get_height()
+                maxh = text.get_height()
 
-            
+            trow.append(text)
+        grid.append(trow)
+
+    offsetx, offsety = 0, 0
+    print maxw, maxh
+
+    for trow in grid:
+        for text in trow:
+            g = clutter.Group()
 
             rect = clutter.Rectangle()
-            rect.set_position(offsetx + 5, offsety + 5)
-            rect.set_size(
-                max(text.get_width() + 20, 30),
-                max(text.get_height() + 15, 30))
+            rect.set_position(0, 0)
+            rect.set_size(maxw + 10, maxh + 10)
             rect.set_color(clutter.Color(0x33, 0x22, 0x22, 0xff))
             rect.set_border_color(clutter.color_from_string('white'))
             rect.set_border_width(2)
-            rect.show()
             g.add(rect)
 
-            text.show()
+            text.set_position((rect.get_width() - text.get_width() - 5)/2,
+                              (rect.get_height() - text.get_height() - 5)/2)
             g.add(text)
 
+
+            g.set_property("anchor-gravity", clutter.GRAVITY_CENTER)
+
+            g.set_position(offsetx + maxw/2 + 5, offsety + maxh/2 + 5)
+
+            g.set_reactive (True)
+            g.connect('enter-event', _on_enter)
+            g.connect('leave-event', _on_leave)
+
+            g.show_all()
             stage.add(g)
 
-            offsetx += 50
-        offsety += 50
+            offsetx += maxw + 15
+        offsety += maxh + 20
         offsetx = 0
 
-    # Connect a signal handler to handle mouse clicks and key presses on the stage
     stage.connect("button-press-event", on_stage_button_press)
 
     # Show the window
@@ -122,6 +134,35 @@ def main ():
 
     return 0
 
+
+def _on_enter(button, event):
+    scale_button (button)
+
+def _on_leave(button, event):
+    scale_button (button, True)
+
+def scale_button(b, reverse=False):
+    print b
+    
+    if reverse:
+        scale = 1
+    else:
+        scale = 2
+
+    if reverse:
+        b.set_property("depth", 1)
+    else:
+        b.set_property("depth", 2)
+
+    a = b.animate(clutter.EASE_OUT_ELASTIC, 300, 
+                  "scale-x", scale,
+                  "scale-y", scale)
+    if reverse:
+        a.connect_after('completed', _on_complete, b)
+
+def _on_complete(animation, b):
+    print '_on_complete', b
+    b.set_property("depth", 0)
 
 if __name__ == '__main__':
     sys.exit(main())
