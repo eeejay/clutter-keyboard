@@ -41,6 +41,9 @@ def main ():
     # Create the window and add some child widgets
     window = gtk.Window(gtk.WINDOW_POPUP)
 
+    colormap = window.get_screen().get_rgba_colormap()
+    window.set_colormap(colormap)
+
     # Stop the application when the window is closed
     window.connect('hide', gtk.main_quit)
 
@@ -56,6 +59,8 @@ def main ():
     # Get the stage and set its size and color
     stage = clutter_widget.get_stage()
     stage.set_color(clutter.Color(0x20, 0x4a, 0x87, 0x00))
+    if not clutter.__version__.startswith('1.0'):
+        stage.set_property('use-alpha', True)
 
 
     # Show the stage
@@ -121,15 +126,14 @@ def main ():
             g.set_reactive (True)
             g.connect('enter-event', _on_enter)
             g.connect('leave-event', _on_leave)
+            g.connect("button-press-event", _on_press, text.get_text())
 
             g.show_all()
             stage.add(g)
 
-            offsetx += maxw/2 + 15
-        offsety += maxh/2 + 20
+            offsetx += maxw/2 + 10
+        offsety += maxh/2 + 10
         offsetx = 10
-
-    stage.connect("button-press-event", on_stage_button_press)
 
     # Show the window
     window.show()
@@ -142,6 +146,9 @@ def main ():
 
 def _on_enter(button, event):
     scale_button (button)
+
+def _on_press(button, event, char):
+    print char
 
 def _on_leave(button, event):
     scale_button (button, True)
