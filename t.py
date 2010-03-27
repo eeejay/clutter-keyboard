@@ -39,7 +39,7 @@ def main ():
     stage_color = clutter.Color(0, 0, 0, 255) # Black
 
     # Create the window and add some child widgets
-    window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+    window = gtk.Window(gtk.WINDOW_POPUP)
 
     # Stop the application when the window is closed
     window.connect('hide', gtk.main_quit)
@@ -55,13 +55,20 @@ def main ():
 
     # Get the stage and set its size and color
     stage = clutter_widget.get_stage()
-    stage.set_color(clutter.Color(0x20, 0x4a, 0x87, 0xff))
+    stage.set_color(clutter.Color(0x20, 0x4a, 0x87, 0x00))
 
 
     # Show the stage
     stage.show()
 
     maxw, maxh = 0, 0
+
+    w = gtk.Window(gtk.WINDOW_POPUP)
+    w.set_name('gtk-button')
+    w.ensure_style()
+    s = w.rc_get_style()
+    bg = s.bg[gtk.STATE_NORMAL]
+    lc = s.text[gtk.STATE_NORMAL]
 
     grid = []
 
@@ -72,7 +79,7 @@ def main ():
                 k = k[0]
 
             text = clutter.Text(
-                "Sans 30", k, clutter.Color(0xff, 0, 0, 0xff))
+                "Sans 30", k, clutter.Color(lc.red, lc.green, lc.blue, 0xff))
 
             if text.get_width() > maxw:
                 maxw = text.get_width()
@@ -84,6 +91,7 @@ def main ():
         grid.append(trow)
 
     offsetx, offsety = 10, 10
+
     print maxw, maxh
 
     for trow in grid:
@@ -93,8 +101,9 @@ def main ():
             rect = clutter.Rectangle()
             rect.set_position(0, 0)
             rect.set_size(maxw + 10, maxh + 10)
-            rect.set_color(clutter.Color(0x33, 0x22, 0x22, 0xff))
-            rect.set_border_color(clutter.color_from_string('white'))
+            rect.set_color(clutter.Color(bg.red, bg.green, bg.blue, 0xff))
+            rect.set_border_color(
+                clutter.Color(lc.red, lc.green, lc.blue, 0xff))
             rect.set_border_width(2)
             g.add(rect)
 
