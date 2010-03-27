@@ -40,29 +40,23 @@ def main ():
 
     # Create the window and add some child widgets
     window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-    vbox = gtk.VBox(False, 6)
-    window.add(vbox)
-    vbox.show()
-    button = gtk.Button("Change Color")
-    vbox.pack_end(button, False, False, 0)
-    button.show()
-    button.connect('clicked', on_button_clicked)
 
     # Stop the application when the window is closed
     window.connect('hide', gtk.main_quit)
 
     # Create the clutter widget
     clutter_widget = cluttergtk.Embed()
-    vbox.pack_start(clutter_widget, True, True, 0)
+    window.add(clutter_widget)
     clutter_widget.show()
 
     # Set the size of the widget,
     # because we should not set the size of its stage when using GtkClutterEmbed.
-    clutter_widget.set_size_request(600, 200)
+    clutter_widget.set_size_request(700, 175)
 
     # Get the stage and set its size and color
     stage = clutter_widget.get_stage()
-    stage.set_color(stage_color)
+    stage.set_color(clutter.Color(0x20, 0x4a, 0x87, 0xff))
+
 
     # Show the stage
     stage.show()
@@ -78,7 +72,7 @@ def main ():
                 k = k[0]
 
             text = clutter.Text(
-                "Sans 10", k, clutter.Color(0xff, 0, 0, 0xff))
+                "Sans 30", k, clutter.Color(0xff, 0, 0, 0xff))
 
             if text.get_width() > maxw:
                 maxw = text.get_width()
@@ -89,7 +83,7 @@ def main ():
             trow.append(text)
         grid.append(trow)
 
-    offsetx, offsety = 0, 0
+    offsetx, offsety = 10, 10
     print maxw, maxh
 
     for trow in grid:
@@ -105,11 +99,13 @@ def main ():
             g.add(rect)
 
             text.set_position((rect.get_width() - text.get_width() - 5)/2,
-                              (rect.get_height() - text.get_height() - 5)/2)
+                              (rect.get_height() - text.get_height() - 15)/2)
             g.add(text)
 
 
             g.set_property("anchor-gravity", clutter.GRAVITY_CENTER)
+            g.set_property("scale-x", 0.5)
+            g.set_property("scale-y", 0.5)
 
             g.set_position(offsetx + maxw/2 + 5, offsety + maxh/2 + 5)
 
@@ -120,9 +116,9 @@ def main ():
             g.show_all()
             stage.add(g)
 
-            offsetx += maxw + 15
-        offsety += maxh + 20
-        offsetx = 0
+            offsetx += maxw/2 + 15
+        offsety += maxh/2 + 20
+        offsetx = 10
 
     stage.connect("button-press-event", on_stage_button_press)
 
@@ -142,12 +138,10 @@ def _on_leave(button, event):
     scale_button (button, True)
 
 def scale_button(b, reverse=False):
-    print b
-    
     if reverse:
-        scale = 1
+        scale = 0.5
     else:
-        scale = 2
+        scale = 1
 
     if reverse:
         b.set_property("depth", 1)
@@ -161,7 +155,6 @@ def scale_button(b, reverse=False):
         a.connect_after('completed', _on_complete, b)
 
 def _on_complete(animation, b):
-    print '_on_complete', b
     b.set_property("depth", 0)
 
 if __name__ == '__main__':
