@@ -54,8 +54,6 @@ def main ():
 
     # Set the size of the widget,
     # because we should not set the size of its stage when using GtkClutterEmbed.
-    clutter_widget.set_size_request(700, 175)
-
     # Get the stage and set its size and color
     stage = clutter_widget.get_stage()
     stage.set_color(clutter.Color(0x20, 0x4a, 0x87, 0x00))
@@ -66,7 +64,6 @@ def main ():
     # Show the stage
     stage.show()
 
-    maxw, maxh = 0, 0
 
     w = gtk.Window(gtk.WINDOW_POPUP)
     w.set_name('gtk-button')
@@ -77,6 +74,12 @@ def main ():
 
     grid = []
 
+    maxw, maxh = 100, 100
+
+    offsetx, offsety = 1, 1
+
+    kbw, kbh = 0, 0
+
     for row in qwerty.lowercase:
         trow = []
         for k in row:
@@ -84,24 +87,13 @@ def main ():
                 k = k[0]
 
             text = clutter.Text(
-                "Sans 30", k, clutter.Color(lc.red, lc.green, lc.blue, 0xff))
+                "Sans 24", k, clutter.Color(lc.red, lc.green, lc.blue, 0xff))
 
             if text.get_width() > maxw:
                 maxw = text.get_width()
 
             if text.get_height() > maxh:
                 maxh = text.get_height()
-
-            trow.append(text)
-        grid.append(trow)
-
-    offsetx, offsety = 10, 10
-
-    print maxw, maxh
-
-    for trow in grid:
-        for text in trow:
-            g = clutter.Group()
 
             rect = clutter.Rectangle()
             rect.set_position(0, 0)
@@ -110,12 +102,12 @@ def main ():
             rect.set_border_color(
                 clutter.Color(lc.red, lc.green, lc.blue, 0xff))
             rect.set_border_width(2)
-            g.add(rect)
-
             text.set_position((rect.get_width() - text.get_width() - 5)/2,
                               (rect.get_height() - text.get_height() - 15)/2)
-            g.add(text)
 
+            g = clutter.Group()
+            g.add(rect)
+            g.add(text)
 
             g.set_property("anchor-gravity", clutter.GRAVITY_CENTER)
             g.set_property("scale-x", 0.5)
@@ -131,9 +123,16 @@ def main ():
             g.show_all()
             stage.add(g)
 
-            offsetx += maxw/2 + 10
-        offsety += maxh/2 + 10
-        offsetx = 10
+            offsetx += maxw/2 + 12
+
+        if offsetx - 2> kbw:
+            kbw = offsetx - 2
+        offsety += maxh/2 + 11
+        offsetx = 0
+        
+    kbh = offsety - 2
+
+    clutter_widget.set_size_request(kbw + 52, kbh + 52)
 
     # Show the window
     window.show()
