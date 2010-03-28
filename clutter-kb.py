@@ -24,9 +24,6 @@ ROUNDED_RECT = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 </svg>
 """
 
-already_changed = False
-stage = None
-
 class KeyboardButton(clutter.Group):
     Style = None
     FontDesc = None
@@ -159,9 +156,13 @@ class Keyboard(clutter.Group):
 
         return keybutton
 
-    def connect_key_signals(self, keybutton, value):
+    def connect_key_signals(self, keybutton, value):            
         keybutton.set_reactive (True)
         keybutton.connect("button-press-event", self._on_press, value)
+
+    def _on_press(self, button, event, char):
+        sys.stdout.write(char)
+        sys.stdout.flush()
 
 class ProximityKeyboard(Keyboard):
     def connect_key_signals(self, keybutton, value):
@@ -179,9 +180,6 @@ class ProximityKeyboard(Keyboard):
     def _on_enter(self, button, event):
         button.set_property("depth", 1)
 
-    def _on_press(self, button, event, char):
-        print char
-
     def _on_leave(self, button, event):
         button.set_properties(scale_x=0.5, scale_y=0.5)
         button.set_property("depth", 0)
@@ -196,9 +194,6 @@ class BouncyKeyboard(Keyboard):
 
     def _on_enter(self, button, event):
         self._scale_button (button)
-
-    def _on_press(self, button, event, char):
-        print char
 
     def _on_leave(self, button, event):
         self._scale_button (button, True)
