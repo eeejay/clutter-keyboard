@@ -15,7 +15,8 @@ already_changed = False
 stage = None
 
 class KeyboardButton(clutter.Group):
-    SVG = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+    Style = None
+    Svg = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg"> 
   <rect
        style="fill:$fill;fill-opacity:1.0;fill-rule:evenodd;stroke:$stroke;stroke-opacity:1.0;stroke-width:$stroke_width;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none"
@@ -28,25 +29,32 @@ class KeyboardButton(clutter.Group):
        ry="$corner_radius" />
 </svg>
 """
-    def __init__(self, width, height, style, state, label, stroke_width=8):
+    def __init__(self, width, height, label, stroke_width=8):
         clutter.Group.__init__(self)
+        if self.__class__.Style == None:
+            self._init_style()
         self.label = label
         self.width = width
         self.height = height
         self.stroke_width = stroke_width
-        self.style = style
-        self.state = state
+        self.state = gtk.STATE_NORMAL
 
         self.texture = clutter.CairoTexture(width=width, height=height)
         self.text = clutter.Text()
         self.add(self.texture)
         self.add(self.text)
 
-        self.draw_bg(style, state)
         self.draw_text(label)
+        self.draw_bg()
+
+    def _init_style(self):
+        w = gtk.Window(gtk.WINDOW_POPUP)
+        w.set_name('gtk-button')
+        w.ensure_style()
+        self.__class__.Style = w.rc_get_style()
 
     def draw_text(self, label):
-        color = self.style.fg[self.state]
+        color = self.__class__.Style.fg[self.state]
         self.text.set_font_name("Sans 24")
         self.text.set_color(
             clutter.Color(color.red, color.green, color.blue, 0xff))
@@ -54,14 +62,15 @@ class KeyboardButton(clutter.Group):
         self.text.set_position((self.width - self.text.get_width() - 5)/2,
                                (self.height - self.text.get_height() - 15)/2)
 
-    def draw_bg(self, style, state):
-        svg = string.Template(self.SVG).substitute(
+    def draw_bg(self):
+        s = self.__class__.Style
+        svg = string.Template(self.Svg).substitute(
             x = self.stroke_width/2.0, y=self.stroke_width/2.0,
             width=self.width - self.stroke_width, 
             height=self.height - self.stroke_width,
-            fill=s.bg[state], 
+            fill=s.bg[self.state], 
             stroke_width=self.stroke_width,
-            stroke=s.fg[state],
+            stroke=s.fg[self.state],
             corner_radius=self.stroke_width*2)
 
         svgh = rsvg.Handle()
@@ -79,27 +88,6 @@ class KeyboardButton(clutter.Group):
 
         del svgh
         del cr
-
-def on_button_clicked(button):
-    global already_changed, stage
-
-    if already_changed:
-        stage_color = clutter.Color(0, 0, 0, 255) # Black
-        stage.set_color(stage_color)
-    else:
-        stage_color = clutter.Color(32, 32, 160, 255)
-        stage.set_color(stage_color)
-
-    already_changed = not already_changed
-
-    return True # Stop further handling of this event
-
-
-def on_stage_button_press(stage, event):
-    print "Stage clicked at (%f, %f)" % (event.x, event.y)
-
-    return True # Stop further handling of this event
-
 
 def main ():
     global stage
@@ -132,16 +120,6 @@ def main ():
     # Show the stage
     stage.show()
 
-
-    w = gtk.Window(gtk.WINDOW_POPUP)
-    w.set_name('gtk-button')
-    w.ensure_style()
-    s = w.rc_get_style()
-    bg = s.bg[gtk.STATE_NORMAL]
-    lc = s.text[gtk.STATE_NORMAL]
-
-    grid = []
-
     maxw, maxh = 100, 100
 
     offsetx, offsety = 1, 1
@@ -154,8 +132,7 @@ def main ():
             if isinstance(k, tuple):
                 k = k[0]
 
-            rect = KeyboardButton(maxw + 10, maxh + 10, s, gtk.STATE_NORMAL,
-                                  k)
+            rect = KeyboardButton(maxw + 10, maxh + 10, k)
             rect.set_property("anchor-gravity", clutter.GRAVITY_CENTER)
             rect.set_property("scale-x", 0.5)
             rect.set_property("scale-y", 0.5)
@@ -220,9 +197,4 @@ def _on_complete(animation, b):
     b.set_property("depth", 0)
 
 if __name__ == '__main__':
-    w = gtk.Window(gtk.WINDOW_POPUP)
-    w.set_name('gtk-button')
-    w.ensure_style()
-    s = w.rc_get_style()
-
     sys.exit(main())
