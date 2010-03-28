@@ -9,15 +9,7 @@ import rsvg
 import string
 import cairo
 
-SCALE = 1.0
-
-already_changed = False
-stage = None
-
-class KeyboardButton(clutter.Group):
-    Style = None
-    FontDesc = None
-    Svg = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+ROUNDED_RECT = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg"> 
   <rect
        style="fill:$fill;fill-opacity:$fill_opacity;fill-rule:evenodd;stroke:$stroke;stroke-opacity:$stroke_opacity;stroke-width:$stroke_width;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none"
@@ -30,7 +22,14 @@ class KeyboardButton(clutter.Group):
        ry="$corner_radius" />
 </svg>
 """
-    def __init__(self, label, border_width=8, padding=20):
+
+already_changed = False
+stage = None
+
+class KeyboardButton(clutter.Group):
+    Style = None
+    FontDesc = None
+    def __init__(self, label, border_width=4, padding=10):
         clutter.Group.__init__(self)
         if self.__class__.Style == None:
             self._init_style()
@@ -66,7 +65,7 @@ class KeyboardButton(clutter.Group):
         w.ensure_style()
         self.__class__.Style = w.rc_get_style()
         self.__class__.FontDesc = self.__class__.Style.font_desc.copy()
-        self.__class__.FontDesc.set_size(self.__class__.FontDesc.get_size()*4)
+        self.__class__.FontDesc.set_size(self.__class__.FontDesc.get_size()*2)
 
     def set_size(self, w, h):
         clutter.Group.set_size(self, w, h)
@@ -89,7 +88,7 @@ class KeyboardButton(clutter.Group):
     def draw_bg(self):
         width, height = self.get_size()
         s = self.__class__.Style
-        svg = string.Template(self.Svg).substitute(
+        svg = string.Template(ROUNDED_RECT).substitute(
             x = self.stroke_width/2.0, y=self.stroke_width/2.0,
             width=width - self.stroke_width, 
             height=height - self.stroke_width,
@@ -116,19 +115,23 @@ class KeyboardButton(clutter.Group):
         del cr
 
 class Keyboard(clutter.Group):
-    def __init__(self):
+    def __init__(self, spacing=4):
         clutter.Group.__init__(self)
         self._rows = []
         self._max_row_len = 0
         self._max_dimension = 0
+        self.spacing = spacing
         self.connect('realize', self._realize_cb)
         
     def _realize_cb(self, kb):
         for i, row in enumerate(self._rows):
+            vspace = i*self.spacing
             for r, k in enumerate(row):
+                hspace = r*self.spacing
                 k.set_size(self._max_dimension, self._max_dimension)
-                k.set_position(self._max_dimension/2 + r*self._max_dimension/2,
-                               self._max_dimension/2 + i*self._max_dimension/2)
+                k.set_position(
+                    self._max_dimension/2 + r*self._max_dimension/2 + hspace,
+                    self._max_dimension/2 + i*self._max_dimension/2 + vspace)
 
     def add_key(self, row_index, key):
         if row_index < 0 or row_index >= len(self._rows):
