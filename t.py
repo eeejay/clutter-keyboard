@@ -8,6 +8,7 @@ import glib
 import rsvg
 import string
 import cairo
+from math import sqrt
 
 ROUNDED_RECT = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg"> 
@@ -159,14 +160,39 @@ class Keyboard(clutter.Group):
         return keybutton
 
     def connect_key_signals(self, keybutton, value):
-        pass
+        keybutton.set_reactive (True)
+        keybutton.connect("button-press-event", self._on_press, value)
+
+class ProximityKeyboard(Keyboard):
+    def connect_key_signals(self, keybutton, value):
+        Keyboard.connect_key_signals(self, keybutton, value)
+        keybutton.connect('enter-event', self._on_enter)
+        keybutton.connect('leave-event', self._on_leave)
+        keybutton.connect('motion-event', self._on_motion)
+
+    def _on_motion(self, button, event):
+        bx, by =  button.get_position()
+        distance = sqrt((event.x - bx)**2 + (event.y - by)**2)
+        button.set_properties(scale_x=max((distance - 50)/-40, 0.5),
+                              scale_y=max((distance - 50)/-40, 0.5))
+
+    def _on_enter(self, button, event):
+        button.set_property("depth", 1)
+
+    def _on_press(self, button, event, char):
+        print char
+
+    def _on_leave(self, button, event):
+        button.set_properties(scale_x=0.5, scale_y=0.5)
+        button.set_property("depth", 0)
+
+    
 
 class BouncyKeyboard(Keyboard):
     def connect_key_signals(self, keybutton, value):
-        keybutton.set_reactive (True)
+        Keyboard.connect_key_signals(self, keybutton, value)
         keybutton.connect('enter-event', self._on_enter)
         keybutton.connect('leave-event', self._on_leave)
-        keybutton.connect("button-press-event", self._on_press, value)
 
     def _on_enter(self, button, event):
         self._scale_button (button)
@@ -235,5 +261,14 @@ class Main(object):
         self.keyboard.show_all()
 
 if __name__ == '__main__':
-    m = Main(BouncyKeyboard)
+    if "proximity" in sys.argv[1:]:
+        keyboard = ProximityKeyboard
+    elif "bouncy" in sys.argv[1:]:
+        keyboard = BouncyKeyboard
+    else:
+        print "usage: %s %s|%s <options>" % \
+            (sys.argv[0], "proximity", "bouncy")
+        sys.exit(1)
+
+    m = Main(keyboard)
     m.start()
