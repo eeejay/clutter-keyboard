@@ -134,129 +134,106 @@ class Keyboard(clutter.Group):
                     self._max_dimension/2 + i*self._max_dimension/2 + vspace)
 
     def add_key(self, row_index, key):
-        if row_index < 0 or row_index >= len(self._rows):
-            self._rows.append([key])
+        if isinstance(key, tuple):
+            key, val = key
         else:
-            self._rows[row_index].append(key)
+            val = key
+
+        keybutton = KeyboardButton(key)
+        keybutton.set_properties(anchor_gravity=clutter.GRAVITY_CENTER,
+                                 scale_x=0.5, scale_y=0.5)
+
+        if row_index < 0 or row_index >= len(self._rows):
+            self._rows.append([keybutton])
+        else:
+            self._rows[row_index].append(keybutton)
         
-        min_d = max(*key.get_properties("min-width", "min-height"))
+        min_d = max(*keybutton.get_properties("min-width", "min-height"))
         if min_d > self._max_dimension:
             self._max_dimension = min_d
 
-        self.add(key)
-    
-def main ():
-    global stage
+        self.add(keybutton)
 
-    stage_color = clutter.Color(0, 0, 0, 255) # Black
+        self.connect_key_signals(keybutton, val)
 
-    # Create the window and add some child widgets
-    window = gtk.Window(gtk.WINDOW_POPUP)
+        return keybutton
 
-    colormap = window.get_screen().get_rgba_colormap()
-    window.set_colormap(colormap)
+    def connect_key_signals(self, keybutton, value):
+        pass
 
-    # Stop the application when the window is closed
-    window.connect('hide', gtk.main_quit)
+class BouncyKeyboard(Keyboard):
+    def connect_key_signals(self, keybutton, value):
+        keybutton.set_reactive (True)
+        keybutton.connect('enter-event', self._on_enter)
+        keybutton.connect('leave-event', self._on_leave)
+        keybutton.connect("button-press-event", self._on_press, value)
 
-    # Create the clutter widget
-    clutter_widget = cluttergtk.Embed()
-    window.add(clutter_widget)
-    clutter_widget.show()
+    def _on_enter(self, button, event):
+        self._scale_button (button)
 
-    # Set the size of the widget,
-    # because we should not set the size of its stage when using GtkClutterEmbed.
-    # Get the stage and set its size and color
-    stage = clutter_widget.get_stage()
-    stage.set_color(clutter.Color(0x20, 0x4a, 0x87, 0x00))
-    if not clutter.__version__.startswith('1.0'):
-        stage.set_property('use-alpha', True)
+    def _on_press(self, button, event, char):
+        print char
 
+    def _on_leave(self, button, event):
+        self._scale_button (button, True)
 
-    # Show the stage
-    stage.show()
+    def _scale_button(self, b, reverse=False):
+        if reverse:
+            scale = 0.5
+        else:
+            scale = 1
 
-    maxw, maxh = 100, 100
+        if reverse:
+            b.set_property("depth", 1)
+        else:
+            b.set_property("depth", 2)
 
-    offsetx, offsety = 1, 1
+        a = b.animate(clutter.EASE_OUT_ELASTIC, 300, 
+                      "scale-x", scale,
+                      "scale-y", scale)
+        if reverse:
+            a.connect_after('completed', self._on_complete, b)
 
-    kbw, kbh = 0, 0
+    def _on_complete(self, animation, b):
+        b.set_property("depth", 0)
 
-    kb = Keyboard()
+class Main(object):
+    def __init__(self, keyboard_cls):
+        self.window =  gtk.Window()
+        clutter_widget = cluttergtk.Embed()
+        self.window.add(clutter_widget)
+        clutter_widget.show()
 
-    for i, row in enumerate(qwerty.lowercase):
-        trow = []
-        for k in row:
-            if isinstance(k, tuple):
-                k = k[0]
-
-            rect = KeyboardButton(k)
-            rect.set_property("anchor-gravity", clutter.GRAVITY_CENTER)
-            rect.set_property("scale-x", 0.5)
-            rect.set_property("scale-y", 0.5)
-
-            rect.set_reactive (True)
-            rect.connect('enter-event', _on_enter)
-            rect.connect('leave-event', _on_leave)
-            rect.connect("button-press-event", _on_press, k)
-
-            rect.show_all()
-            
-            kb.add_key(i, rect)
-
-            offsetx += maxw/2 + 12
-
-        if offsetx - 2> kbw:
-            kbw = offsetx - 2
-        offsety += maxh/2 + 11
-        offsetx = 0
+        self.stage = clutter_widget.get_stage()
+        self.stage.set_color(clutter.Color(0x20, 0x4a, 0x87, 0x00))
+        if not clutter.__version__.startswith('1.0'):
+            self.stage.set_property('use-alpha', True)
         
-    stage.add(kb)
-
-    kbh = offsety - 2
-
-    print kbw + 52, kbh + 52
-    print kb.get_size()
-
-    clutter_widget.set_size_request(*map(int,(kb.get_size())))
-
-    # Show the window
-    window.show()
-
-    # Start the main loop, so we can respond to events:
-    gtk.main()
-
-    return 0
+        self.stage.show_all()
 
 
-def _on_enter(button, event):
-    scale_button (button)
+        self.keyboard = keyboard_cls()
 
-def _on_press(button, event, char):
-    print char
+        self._populate_keyboard(qwerty.lowercase)
 
-def _on_leave(button, event):
-    scale_button (button, True)
+        self.stage.add(self.keyboard)
 
-def scale_button(b, reverse=False):
-    if reverse:
-        scale = 0.5
-    else:
-        scale = 1
+        clutter_widget.set_size_request(*map(int,(self.keyboard.get_size())))
 
-    if reverse:
-        b.set_property("depth", 1)
-    else:
-        b.set_property("depth", 2)
+        # Show the window
+        self.window.show()
 
-    a = b.animate(clutter.EASE_OUT_ELASTIC, 300, 
-                  "scale-x", scale,
-                  "scale-y", scale)
-    if reverse:
-        a.connect_after('completed', _on_complete, b)
+        
+    def start(self):
+        gtk.main()
 
-def _on_complete(animation, b):
-    b.set_property("depth", 0)
+    def _populate_keyboard(self, layout):
+        for i, row in enumerate(layout):
+            for k in row:                                
+                keybutton = self.keyboard.add_key(i, k)
+
+        self.keyboard.show_all()
 
 if __name__ == '__main__':
-    sys.exit(main())
+    m = Main(BouncyKeyboard)
+    m.start()
