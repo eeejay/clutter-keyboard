@@ -5,12 +5,80 @@ import clutter
 import gtk
 import qwerty
 import glib
+import rsvg
+import string
+import cairo
 
 SCALE = 1.0
 
 already_changed = False
 stage = None
 
+class KeyboardButton(clutter.Group):
+    SVG = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg"> 
+  <rect
+       style="fill:$fill;fill-opacity:1.0;fill-rule:evenodd;stroke:$stroke;stroke-opacity:1.0;stroke-width:$stroke_width;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none"
+       id="highlight"
+       width="$width"
+       height="$height"
+       x="$x"
+       y="$y"
+       rx="$corner_radius"
+       ry="$corner_radius" />
+</svg>
+"""
+    def __init__(self, width, height, style, state, label, stroke_width=8):
+        clutter.Group.__init__(self)
+        self.label = label
+        self.width = width
+        self.height = height
+        self.stroke_width = stroke_width
+        self.style = style
+        self.state = state
+
+        self.texture = clutter.CairoTexture(width=width, height=height)
+        self.text = clutter.Text()
+        self.add(self.texture)
+        self.add(self.text)
+
+        self.draw_bg(style, state)
+        self.draw_text(label)
+
+    def draw_text(self, label):
+        color = self.style.fg[self.state]
+        self.text.set_font_name("Sans 24")
+        self.text.set_color(
+            clutter.Color(color.red, color.green, color.blue, 0xff))
+        self.text.set_text(label)
+        self.text.set_position((self.width - self.text.get_width() - 5)/2,
+                               (self.height - self.text.get_height() - 15)/2)
+
+    def draw_bg(self, style, state):
+        svg = string.Template(self.SVG).substitute(
+            x = self.stroke_width/2.0, y=self.stroke_width/2.0,
+            width=self.width - self.stroke_width, 
+            height=self.height - self.stroke_width,
+            fill=s.bg[state], 
+            stroke_width=self.stroke_width,
+            stroke=s.fg[state],
+            corner_radius=self.stroke_width*2)
+
+        svgh = rsvg.Handle()
+        svgh.write (svg)
+        svgh.close()
+
+        self.texture.set_size(self.width, self.height)
+
+        cr = self.texture.cairo_create()
+        #cr.scale(self.width, self.height)
+        cr.set_source_rgba(1.0, 1.0, 1.0, 0.0)
+        cr.set_operator(cairo.OPERATOR_OVER)
+        cr.paint()
+        svgh.render_cairo(cr)
+
+        del svgh
+        del cr
 
 def on_button_clicked(button):
     global already_changed, stage
@@ -86,42 +154,21 @@ def main ():
             if isinstance(k, tuple):
                 k = k[0]
 
-            text = clutter.Text(
-                "Sans 24", k, clutter.Color(lc.red, lc.green, lc.blue, 0xff))
+            rect = KeyboardButton(maxw + 10, maxh + 10, s, gtk.STATE_NORMAL,
+                                  k)
+            rect.set_property("anchor-gravity", clutter.GRAVITY_CENTER)
+            rect.set_property("scale-x", 0.5)
+            rect.set_property("scale-y", 0.5)
 
-            if text.get_width() > maxw:
-                maxw = text.get_width()
+            rect.set_position(offsetx + maxw/2 + 5, offsety + maxh/2 + 5)
 
-            if text.get_height() > maxh:
-                maxh = text.get_height()
+            rect.set_reactive (True)
+            rect.connect('enter-event', _on_enter)
+            rect.connect('leave-event', _on_leave)
+            rect.connect("button-press-event", _on_press, k)
 
-            rect = clutter.Rectangle()
-            rect.set_position(0, 0)
-            rect.set_size(maxw + 10, maxh + 10)
-            rect.set_color(clutter.Color(bg.red, bg.green, bg.blue, 0xff))
-            rect.set_border_color(
-                clutter.Color(lc.red, lc.green, lc.blue, 0xff))
-            rect.set_border_width(2)
-            text.set_position((rect.get_width() - text.get_width() - 5)/2,
-                              (rect.get_height() - text.get_height() - 15)/2)
-
-            g = clutter.Group()
-            g.add(rect)
-            g.add(text)
-
-            g.set_property("anchor-gravity", clutter.GRAVITY_CENTER)
-            g.set_property("scale-x", 0.5)
-            g.set_property("scale-y", 0.5)
-
-            g.set_position(offsetx + maxw/2 + 5, offsety + maxh/2 + 5)
-
-            g.set_reactive (True)
-            g.connect('enter-event', _on_enter)
-            g.connect('leave-event', _on_leave)
-            g.connect("button-press-event", _on_press, text.get_text())
-
-            g.show_all()
-            stage.add(g)
+            rect.show_all()
+            stage.add(rect)
 
             offsetx += maxw/2 + 12
 
@@ -173,4 +220,9 @@ def _on_complete(animation, b):
     b.set_property("depth", 0)
 
 if __name__ == '__main__':
+    w = gtk.Window(gtk.WINDOW_POPUP)
+    w.set_name('gtk-button')
+    w.ensure_style()
+    s = w.rc_get_style()
+
     sys.exit(main())
