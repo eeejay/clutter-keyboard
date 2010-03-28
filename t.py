@@ -16,10 +16,11 @@ stage = None
 
 class KeyboardButton(clutter.Group):
     Style = None
+    FontDesc = None
     Svg = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg"> 
   <rect
-       style="fill:$fill;fill-opacity:1.0;fill-rule:evenodd;stroke:$stroke;stroke-opacity:1.0;stroke-width:$stroke_width;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none"
+       style="fill:$fill;fill-opacity:$fill_opacity;fill-rule:evenodd;stroke:$stroke;stroke-opacity:$stroke_opacity;stroke-width:$stroke_width;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none"
        id="highlight"
        width="$width"
        height="$height"
@@ -29,58 +30,83 @@ class KeyboardButton(clutter.Group):
        ry="$corner_radius" />
 </svg>
 """
-    def __init__(self, width, height, label, stroke_width=8):
+    def __init__(self, label, border_width=8, padding=20):
         clutter.Group.__init__(self)
         if self.__class__.Style == None:
             self._init_style()
         self.label = label
-        self.width = width
-        self.height = height
-        self.stroke_width = stroke_width
+        self.stroke_width = border_width
+        self.padding = padding
         self.state = gtk.STATE_NORMAL
 
-        self.texture = clutter.CairoTexture(width=width, height=height)
         self.text = clutter.Text()
+        w, h = self.draw_text(self.label)
+
+        self.set_properties(min_width=w + self.padding*2,
+                            min_height=h + self.padding*2)
+
+        self.texture = None
+
+        self.connect('realize', self._on_realized)
+
+    def _on_realized(self, button):
+        width, height = self.get_size()
+
+        self.texture = clutter.CairoTexture(
+            width=int(width), height=int(height))
+        self.draw_bg()
+
         self.add(self.texture)
         self.add(self.text)
 
-        self.draw_text(label)
-        self.draw_bg()
 
     def _init_style(self):
         w = gtk.Window(gtk.WINDOW_POPUP)
         w.set_name('gtk-button')
         w.ensure_style()
         self.__class__.Style = w.rc_get_style()
+        self.__class__.FontDesc = self.__class__.Style.font_desc.copy()
+        self.__class__.FontDesc.set_size(self.__class__.FontDesc.get_size()*4)
+
+    def set_size(self, w, h):
+        clutter.Group.set_size(self, w, h)
+        if self.texture:
+            self.texture.set_size(w, h)
+        if self.text:
+            tw, th = self.text.get_size()
+            x, y = self.get_position()
+            self.text.set_position(x + (w - tw)/2, y + (h - th)/2)
 
     def draw_text(self, label):
         color = self.__class__.Style.fg[self.state]
-        self.text.set_font_name("Sans 24")
+        width, height = self.get_size()
+        self.text.set_font_name(self.FontDesc.to_string())
         self.text.set_color(
             clutter.Color(color.red, color.green, color.blue, 0xff))
         self.text.set_text(label)
-        self.text.set_position((self.width - self.text.get_width() - 5)/2,
-                               (self.height - self.text.get_height() - 15)/2)
+        return self.text.get_size()
 
     def draw_bg(self):
+        width, height = self.get_size()
         s = self.__class__.Style
         svg = string.Template(self.Svg).substitute(
             x = self.stroke_width/2.0, y=self.stroke_width/2.0,
-            width=self.width - self.stroke_width, 
-            height=self.height - self.stroke_width,
+            width=width - self.stroke_width, 
+            height=height - self.stroke_width,
             fill=s.bg[self.state], 
             stroke_width=self.stroke_width,
             stroke=s.fg[self.state],
-            corner_radius=self.stroke_width*2)
+            corner_radius=self.stroke_width*2,
+            fill_opacity=0.85,
+            stroke_opacity=0.9)
 
         svgh = rsvg.Handle()
         svgh.write (svg)
         svgh.close()
 
-        self.texture.set_size(self.width, self.height)
+        self.texture.set_size(width, height)
 
         cr = self.texture.cairo_create()
-        #cr.scale(self.width, self.height)
         cr.set_source_rgba(1.0, 1.0, 1.0, 0.0)
         cr.set_operator(cairo.OPERATOR_OVER)
         cr.paint()
@@ -89,6 +115,33 @@ class KeyboardButton(clutter.Group):
         del svgh
         del cr
 
+class Keyboard(clutter.Group):
+    def __init__(self):
+        clutter.Group.__init__(self)
+        self._rows = []
+        self._max_row_len = 0
+        self._max_dimension = 0
+        self.connect('realize', self._realize_cb)
+        
+    def _realize_cb(self, kb):
+        for i, row in enumerate(self._rows):
+            for r, k in enumerate(row):
+                k.set_size(self._max_dimension, self._max_dimension)
+                k.set_position(self._max_dimension/2 + r*self._max_dimension/2,
+                               self._max_dimension/2 + i*self._max_dimension/2)
+
+    def add_key(self, row_index, key):
+        if row_index < 0 or row_index >= len(self._rows):
+            self._rows.append([key])
+        else:
+            self._rows[row_index].append(key)
+        
+        min_d = max(*key.get_properties("min-width", "min-height"))
+        if min_d > self._max_dimension:
+            self._max_dimension = min_d
+
+        self.add(key)
+    
 def main ():
     global stage
 
@@ -126,18 +179,18 @@ def main ():
 
     kbw, kbh = 0, 0
 
-    for row in qwerty.lowercase:
+    kb = Keyboard()
+
+    for i, row in enumerate(qwerty.lowercase):
         trow = []
         for k in row:
             if isinstance(k, tuple):
                 k = k[0]
 
-            rect = KeyboardButton(maxw + 10, maxh + 10, k)
+            rect = KeyboardButton(k)
             rect.set_property("anchor-gravity", clutter.GRAVITY_CENTER)
             rect.set_property("scale-x", 0.5)
             rect.set_property("scale-y", 0.5)
-
-            rect.set_position(offsetx + maxw/2 + 5, offsety + maxh/2 + 5)
 
             rect.set_reactive (True)
             rect.connect('enter-event', _on_enter)
@@ -145,7 +198,8 @@ def main ():
             rect.connect("button-press-event", _on_press, k)
 
             rect.show_all()
-            stage.add(rect)
+            
+            kb.add_key(i, rect)
 
             offsetx += maxw/2 + 12
 
@@ -154,9 +208,14 @@ def main ():
         offsety += maxh/2 + 11
         offsetx = 0
         
+    stage.add(kb)
+
     kbh = offsety - 2
 
-    clutter_widget.set_size_request(kbw + 52, kbh + 52)
+    print kbw + 52, kbh + 52
+    print kb.get_size()
+
+    clutter_widget.set_size_request(*map(int,(kb.get_size())))
 
     # Show the window
     window.show()
